@@ -4,11 +4,14 @@ from dotenv import load_dotenv
 from schemas.books import Books
 from openai import OpenAI
 import time
+from supabase import Client
+from supabase_client import get_supabase
 
 load_dotenv()
 
 GOOGLE_BOOKS_API_KEY = os.environ["GOOGLE_BOOKS_API_KEY"]
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+open_ai_client = OpenAI()
 
 collection = []
 seen_ids = set()
@@ -77,9 +80,33 @@ def get_books():
             start += 40
             time.sleep(2)
 
-            # TODO: embedding calls
-            # TODO: insert to database
+def embed_books():
+    supabase = get_supabase()
+    collection_length = len(collection)
+
+    for i in range(0, collection_length, 20):
+        batch = collection[i : i + 20]
+        descriptions = []
+        
+        for book in batch:
+            descriptions.append(book.description)
+
+        try:
+            generate_embedding = open_ai_client.embeddings.create(input=descriptions, model="text-embedding-3-small")
+        except Exception as e:
+            print(e)
+            time.sleep(2)
+            continue
+
+        embedded_books = []
+        for index, book in enumerate(batch, start=0):
+            book_model = book.model_dump()
+            book_model["embedding"] = generate_embedding.data[index].embedding
+            embedded_books.append(book_model)
+
+        supabase.table("books").insert(embedded_books).execute()
+        time.sleep(2)
 
 if __name__ == "__main__":
     get_books()
-    print(len(collection))
+    embed_books()
