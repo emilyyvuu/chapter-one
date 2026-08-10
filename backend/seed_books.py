@@ -101,6 +101,7 @@ def embed_books():
         embedded_books = []
         for index, book in enumerate(batch, start=0):
             book_model = book.model_dump()
+            book_model["author"] = ", ".join(book.author)
             book_model["embedding"] = generate_embedding.data[index].embedding
             embedded_books.append(book_model)
 

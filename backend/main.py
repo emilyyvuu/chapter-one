@@ -79,6 +79,7 @@ def add_book(book: Books, rating: int):
                                 model="text-embedding-3-small"
                             )
         book_model = book.model_dump()
+        book_model["author"] = ", ".join(book.author)
         book_model["embedding"] = generate_embedding.data[0].embedding
         response = supabase.table("books").insert(book_model).execute()
         book_check_id = response.data[0]["id"]
