@@ -1,5 +1,7 @@
 import os
 import httpx
+import numpy as np
+import json
 from fastapi import FastAPI, HTTPException
 from supabase import Client
 from supabase_client import get_supabase
@@ -87,7 +89,20 @@ def add_book(book: Books, rating: int):
     rating_response = supabase.table("ratings").insert({
         "book_id": book_check_id,
         "rating": rating,
-        "user_id": 1
+        "user_id": 1 # TODO: replace userid placeholder here
     }).execute()
 
     return rating_response.data
+
+@app.get("/recommendations")
+def get_recommendations(user_id: int):
+    supabase = get_supabase()
+
+    # get embeddings of all books the user rated >= 4
+    response = supabase.table("ratings").select("books!inner(embedding)").gte("rating", 4).eq("user_id", 1).execute() # TODO: replace userid placeholder here
+    if not response.data:
+        return []
+
+    # create taste vector, average of the embeddings returned from the response
+    embedding_list = [json.loads(item["books"]["embedding"]) for item in response.data]
+    taste_vector = np.mean(embedding_list, axis=0)
