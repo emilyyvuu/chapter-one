@@ -61,6 +61,7 @@ def get_library():
 @app.post("/library")
 def add_book(book: Books, rating: int):
     supabase = get_supabase()
+    # check that a book hasn't been added yet
     book_check = (
         supabase.table("books")
         .select("id")
@@ -101,8 +102,17 @@ def get_recommendations(user_id: int):
     # get embeddings of all books the user rated >= 4
     response = supabase.table("ratings").select("books!inner(embedding)").gte("rating", 4).eq("user_id", 1).execute() # TODO: replace userid placeholder here
     if not response.data:
+        # if there are no rated books, give no recommendations
         return []
 
-    # create taste vector, average of the embeddings returned from the response
+    # create taste vector, average of the embeddings of the rated books returned from the response
     embedding_list = [json.loads(item["books"]["embedding"]) for item in response.data]
     taste_vector = np.mean(embedding_list, axis=0)
+
+    # get the list of excluded books (books that the user rated that shouldn't be included in the 
+    # recommendations returned)
+    excluded_books = supabase.table("ratings").select("book_id").eq("user_id", 1).execute() # TODO: replace userid placeholder here
+    get_excluded_ids = [book["book_id"] for book in excluded_books.data]
+
+    get_matched_books = supabase.rpc("match_books", { "query_embedding": taste_vector.tolist(), "exclude_ids": get_excluded_ids, "match_count": 20 } ).execute()
+    return get_matched_books.data
