@@ -8,6 +8,7 @@ from supabase_client import get_supabase
 from dotenv import load_dotenv
 from schemas.books import Books
 from openai import OpenAI
+import asyncio
 
 load_dotenv()
 
@@ -28,9 +29,30 @@ async def search_book(q: str):
         "q": q,
         "key": GOOGLE_BOOKS_API_KEY
     }
+    max_attempts = 5
+    response = None
+
     async with httpx.AsyncClient() as client:
-        response = await client.get("https://www.googleapis.com/books/v1/volumes", params=params)
-        response.raise_for_status()  
+        for attempt in range(max_attempts):
+            try:
+                response = await client.get(
+                    "https://www.googleapis.com/books/v1/volumes", params=params
+                )
+                response.raise_for_status()
+                break  # success, leave the loop
+            except httpx.HTTPStatusError as e:
+                # Only retry rate limits / outages.
+                if e.response.status_code not in (429, 503):
+                    raise HTTPException(status_code=502, detail="Book search failed")
+            except httpx.RequestError:
+                pass 
+
+            response = None  # this attempt failed
+            if attempt < max_attempts - 1:
+                await asyncio.sleep(attempt + 1)  # wait 1s, 2s, 3s
+
+    if response is None:
+        raise HTTPException(status_code=503, detail="Book search is temporarily unavailable")
 
     data = response.json()
     items = data.get("items", [])
