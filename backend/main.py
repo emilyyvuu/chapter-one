@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from schemas.books import Books
 from openai import OpenAI
 import asyncio
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
@@ -16,6 +17,17 @@ GOOGLE_BOOKS_API_KEY = os.environ["GOOGLE_BOOKS_API_KEY"]
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
  
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 open_ai_client = OpenAI()
 
 @app.get("/")
